@@ -1,14 +1,3 @@
-# ttlHashMap
-A general-purpose, thread-safe hash map that supports TTL of the items. It is built upon https://github.com/tidwall/hashmap.c.git .
-
-## Features
-- All features from tidwall/hashmap.c
-- The TTL of item can be set for expiration
-- Thread-Safety
-- A general-purpose task scheduler implemented with time wheel and can be reused by maintaining refcount
-
-## Example
-```c
 #include <stdio.h>
 #include <string.h>
 #include "ttlmap.h"
@@ -93,58 +82,4 @@ int main()
 	ttlmap_scan(map, user_iter, NULL);
 
 	ttlmap_free(map);
-
-// make:
-// gcc ttlmaptest.c ttlmap.c timewheel.c hashmap.c -lpthread && ./a.out
-
-// output:
-// -- get some users --
-// Jane age=47
-// Roger age=68
-// Dale age=44
-// not exists
-
-// -- iterate over all users (ttlmap_scan) --
-// Dale (age=44)
-// Roger (age=68)
-// Jane (age=47)
-
-// -- iterate over all users (ttlmap_iter) --
-// Dale (age=44)
-// Roger (age=68)
-// Jane (age=47)
-
-// -- iterate over all users (after 4s) --
-// Roger (age=68)
-// Jane (age=47)
-
-// -- iterate over all users (after 7s) --
-// Jane (age=47)
-
-// -- iterate over all users (after 10s) --
-// }
-```
-
-## Functions
-### Basic
-```sh
-ttlmap_new      # allocate a new ttl hash map
-ttlmap_free     # free the ttl hash map
-ttlmap_count    # returns the number of items in the ttl hash map
-ttlmap_set      # insert or replace an existing item and return the previous
-ttlmap_get      # get an existing item (ttl will be set if ttl_ms > 0)
-ttlmap_delete   # delete and return an item
-ttlmap_clear    # clear the ttl hash map
-```
-### Iteration
-```sh
-ttlmap_iter     # loop based iteration over all items in ttl hash map 
-ttlmap_scan     # callback based iteration over all items in ttl hash map
-```
-### Hash helpers
-```sh
-ttlmap_sip      # returns hash value for data using SipHash-2-4
-ttlmap_murmur   # returns hash value for data using MurmurHash3
-```
-## License
-ttlHashMap source code is available under the MIT License.
+}
