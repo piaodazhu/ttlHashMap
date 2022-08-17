@@ -259,7 +259,6 @@ void tw_canceltask(twtask_t *task)
 
 void* _clockdriver(void *arg) {
 	timewheel_t *tw = arg;
-	tw->tw_status = TW_STATUS_RUNNING;
 
 	int epfd = epoll_create(1);
 	struct epoll_event ev;
@@ -279,7 +278,7 @@ void* _clockdriver(void *arg) {
 		nevents = epoll_wait(epfd, events, 4, -1);
 		for (i = 0; i < nevents; i++) {
 			if (events[i].events & EPOLLERR || events[i].events & EPOLLHUP) {
-				printf("timewheel clock driver shutdown...\n");
+				// printf("timewheel clock driver shutdown...\n");
 				pthread_exit(NULL);
 			}
 
@@ -294,12 +293,13 @@ void* _clockdriver(void *arg) {
 pthread_t tw_runthread(timewheel_t *tw)
 {
 	pthread_t ret, tid;
-	// printf("tw_runthread\n");
 	if (tw == NULL) return 0;
+	tw->tw_status = TW_STATUS_RUNNING;
 	ret = pthread_create(&tid, NULL, _clockdriver, tw);
 	if (ret == 0) {
 		tw->loop_tid = tid;
 		return tid;
 	}
+	tw->tw_status = TW_STATUS_READY;
 	return 0;
 }

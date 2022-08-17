@@ -82,4 +82,5 @@ int main()
 	ttlmap_scan(map, user_iter, NULL);
 
 	ttlmap_free(map);
+	return 0;
 }

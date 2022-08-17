@@ -93,6 +93,8 @@ int main()
 	ttlmap_scan(map, user_iter, NULL);
 
 	ttlmap_free(map);
+	return 0;
+}
 
 // make:
 // gcc ttlmaptest.c ttlmap.c timewheel.c hashmap.c -lpthread && ./a.out
