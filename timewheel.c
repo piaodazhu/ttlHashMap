@@ -266,7 +266,7 @@ void* _clockdriver(void *arg) {
 	ev.data.ptr = (void*)tw;
 	epoll_ctl(epfd, EPOLL_CTL_ADD, tw->timer_fd, &ev);
 
-	int i, nevents, ret;
+	int i, j, nevents, ret;
 	struct epoll_event events[4];
 	timewheel_t* evtw;
 	uint64_t exp;
@@ -284,7 +284,9 @@ void* _clockdriver(void *arg) {
 
 			evtw = (timewheel_t*)events[i].data.ptr;
 			ret = read(evtw->timer_fd, &exp, sizeof(uint64_t));
-			tw_nexttick(evtw);
+			for (j = 0; j < exp; j++) {
+				tw_nexttick(evtw);
+			}
 		}
 	}
 	pthread_exit(NULL);
@@ -302,4 +304,23 @@ pthread_t tw_runthread(timewheel_t *tw)
 	}
 	tw->tw_status = TW_STATUS_READY;
 	return 0;
+}
+
+int tw_gettimerfd(timewheel_t *tw)
+{
+	if (tw == NULL) return -1;
+	return tw->timer_fd;
+}
+
+
+void tw_proctimerev(timewheel_t *tw)
+{
+	uint64_t exp;
+	int ret, j;
+	ret = read(tw->timer_fd, &exp, sizeof(uint64_t));
+	if (ret > 0) {
+		for (j = 0; j < exp; j++) {
+			tw_nexttick(tw);
+		}
+	}
 }

@@ -83,8 +83,13 @@ void tw_changetask(twtask_t *task, void (*cb)(void *arg), void *arg);
 void tw_canceltask(twtask_t *task);
 twtask_t* tw_settaskperiod(timewheel_t *tw, twtask_t *task, unsigned int period_ms);
 
-void tw_nexttick(timewheel_t *tw);
+// void tw_nexttick(timewheel_t *tw);
 
+// pthread API
 pthread_t tw_runthread(timewheel_t *tw);
+
+// timerfd API
+int tw_gettimerfd(timewheel_t *tw);
+void tw_proctimerev(timewheel_t *tw);
 
 #endif
