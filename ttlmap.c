@@ -1,6 +1,9 @@
 #include "ttlmap.h"
 
-ttlmap *ttlmap_new(size_t elsize, size_t cap, 
+#define TTLMAP_LOCK(map)	do {if ((map)->safe == 0) pthread_mutex_lock(&((map)->hlock));} while(0);	
+#define TTLMAP_UNLOCK(map)	do {if ((map)->safe == 0) pthread_mutex_unlock(&((map)->hlock));} while(0);	
+
+ttlmap *_ttlmap_new(size_t elsize, size_t cap, 
                             uint64_t seed0, uint64_t seed1,
                             uint64_t (*hash)(const void *item, 
                                              uint64_t seed0, uint64_t seed1),
@@ -8,7 +11,7 @@ ttlmap *ttlmap_new(size_t elsize, size_t cap,
                                            void *udata),
                             void (*elfree)(void *item),
                             void *udata,
-			    timewheel_t *twptr)
+			    timewheel_t *twptr, int safe)
 {
 	ttlmap *map = (ttlmap*)malloc(sizeof(ttlmap));
 	map->hmap = hashmap_new(elsize, cap, seed0, seed1, hash, compare, elfree, udata);
@@ -22,9 +25,66 @@ ttlmap *ttlmap_new(size_t elsize, size_t cap,
 		pthread_mutex_unlock(&twptr->ref_lock);
 		map->tw = twptr;
 	}
-	pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
-	memcpy(&map->hlock, &init_mutex, sizeof(init_mutex));
+
+	if (safe == 0) {
+		map->safe = 0;
+	} else {
+		map->safe = 1;
+		pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
+		memcpy(&map->hlock, &init_mutex, sizeof(init_mutex));
+	}
+	
 	return map;
+}
+
+ttlmap *_ttlmap_new_with_allocator(
+                            void *(*malloc)(size_t), 
+                            void *(*realloc)(void *, size_t), 
+                            void (*free)(void*),
+                            size_t elsize, size_t cap, 
+                            uint64_t seed0, uint64_t seed1,
+                            uint64_t (*hash)(const void *item, 
+                                             uint64_t seed0, uint64_t seed1),
+                            int (*compare)(const void *a, const void *b, 
+                                           void *udata),
+                            void (*elfree)(void *item),
+                            void *udata, 
+			    timewheel_t *twptr, int safe)
+{
+	ttlmap *map = (ttlmap*)malloc(sizeof(ttlmap));
+	map->hmap = hashmap_new_with_allocator(malloc, realloc, free, elsize, cap, seed0, seed1, hash, compare, elfree, udata);
+	if (twptr == NULL) {
+		map->tw = tw_new();
+		tw_runthread(map->tw);
+	} else {
+		pthread_mutex_lock(&twptr->ref_lock);
+		twptr->ref_count++;
+		pthread_mutex_unlock(&twptr->ref_lock);
+		map->tw = twptr;
+	}
+	
+	if (safe == 0) {
+		map->safe = 0;
+	} else {
+		map->safe = 1;
+		pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
+		memcpy(&map->hlock, &init_mutex, sizeof(init_mutex));
+	}
+
+	return map;
+}
+
+ttlmap *ttlmap_new(size_t elsize, size_t cap, 
+                            uint64_t seed0, uint64_t seed1,
+                            uint64_t (*hash)(const void *item, 
+                                             uint64_t seed0, uint64_t seed1),
+                            int (*compare)(const void *a, const void *b, 
+                                           void *udata),
+                            void (*elfree)(void *item),
+                            void *udata,
+			    timewheel_t *twptr)
+{
+	return _ttlmap_new(elsize, cap, seed0, seed1, hash, compare, elfree, udata, twptr, 1);
 }
 
 ttlmap *ttlmap_new_with_allocator(
@@ -41,22 +101,38 @@ ttlmap *ttlmap_new_with_allocator(
                             void *udata, 
 			    timewheel_t *twptr)
 {
-	ttlmap *map = (ttlmap*)malloc(sizeof(ttlmap));
-	map->hmap = hashmap_new_with_allocator(malloc, realloc, free, elsize, cap, seed0, seed1, hash, compare, elfree, udata);
-	if (twptr == NULL) {
-		map->tw = tw_new();
-		tw_runthread(map->tw);
-	} else {
-		pthread_mutex_lock(&twptr->ref_lock);
-		twptr->ref_count++;
-		pthread_mutex_unlock(&twptr->ref_lock);
-		map->tw = twptr;
-	}
-	pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
-	memcpy(&map->hlock, &init_mutex, sizeof(init_mutex));
-	return map;
+	return _ttlmap_new_with_allocator(malloc, realloc, free, elsize, cap, seed0, seed1, hash, compare, elfree, udata, twptr, 1);
 }
 
+ttlmap *ttlmap_new_threadunsafe(size_t elsize, size_t cap, 
+                            uint64_t seed0, uint64_t seed1,
+                            uint64_t (*hash)(const void *item, 
+                                             uint64_t seed0, uint64_t seed1),
+                            int (*compare)(const void *a, const void *b, 
+                                           void *udata),
+                            void (*elfree)(void *item),
+                            void *udata,
+			    timewheel_t *twptr)
+{
+	return _ttlmap_new(elsize, cap, seed0, seed1, hash, compare, elfree, udata, twptr, 0);
+}
+
+ttlmap *ttlmap_new_with_allocator_threadunsafe(
+                            void *(*malloc)(size_t), 
+                            void *(*realloc)(void *, size_t), 
+                            void (*free)(void*),
+                            size_t elsize, size_t cap, 
+                            uint64_t seed0, uint64_t seed1,
+                            uint64_t (*hash)(const void *item, 
+                                             uint64_t seed0, uint64_t seed1),
+                            int (*compare)(const void *a, const void *b, 
+                                           void *udata),
+                            void (*elfree)(void *item),
+                            void *udata, 
+			    timewheel_t *twptr)
+{
+	return _ttlmap_new_with_allocator(malloc, realloc, free, elsize, cap, seed0, seed1, hash, compare, elfree, udata, twptr, 0);
+}
 
 void ttlmap_free(ttlmap *map)
 {
@@ -78,26 +154,26 @@ void ttlmap_free(ttlmap *map)
 
 void ttlmap_clear(ttlmap *map, bool update_cap)
 {
-	pthread_mutex_lock(&map->hlock);
+	TTLMAP_LOCK(map);
 	hashmap_clear(map->hmap, update_cap);
-	pthread_mutex_unlock(&map->hlock);
+	TTLMAP_UNLOCK(map);
 }
 
 size_t ttlmap_count(ttlmap *map)
 {
 	size_t ret;
-	pthread_mutex_lock(&map->hlock);
+	TTLMAP_LOCK(map);
 	hashmap_count(map->hmap);
-	pthread_mutex_unlock(&map->hlock);
+	TTLMAP_UNLOCK(map);
 }
 
 
 bool ttlmap_oom(ttlmap *map)
 {
 	bool ret;
-	pthread_mutex_lock(&map->hlock);
+	TTLMAP_LOCK(map);
 	ret = hashmap_oom(map->hmap);
-	pthread_mutex_unlock(&map->hlock);
+	TTLMAP_UNLOCK(map);
 	return ret;
 }
 
@@ -105,9 +181,9 @@ bool ttlmap_oom(ttlmap *map)
 void *ttlmap_get(ttlmap *map, const void *item)
 {
 	void *ret;
-	pthread_mutex_lock(&map->hlock);
+	TTLMAP_LOCK(map);
 	ret = hashmap_get(map->hmap, item);
-	pthread_mutex_unlock(&map->hlock);
+	TTLMAP_UNLOCK(map);
 	return ret;
 }
 
@@ -126,9 +202,9 @@ void _deleteitem(void *arg) {
 void *ttlmap_set(ttlmap *map, const void *item, int ttl_ms)
 {
 	void *ret;
-	pthread_mutex_lock(&map->hlock);
+	TTLMAP_LOCK(map);
 	ret = hashmap_set(map->hmap, item);
-	pthread_mutex_unlock(&map->hlock);
+	TTLMAP_UNLOCK(map);
 	if (ttl_ms > 0) {
 		struct _delitemarg *darg = (struct _delitemarg*)malloc(sizeof(struct _delitemarg));
 		darg->item = malloc(map->elsize);
@@ -143,9 +219,9 @@ void *ttlmap_set(ttlmap *map, const void *item, int ttl_ms)
 void *ttlmap_delete(ttlmap *map, void *item)
 {
 	void *ret;
-	pthread_mutex_lock(&map->hlock);
+	TTLMAP_LOCK(map);
 	ret = hashmap_delete(map->hmap, item);
-	pthread_mutex_unlock(&map->hlock);
+	TTLMAP_UNLOCK(map);
 	return ret;
 }
 
@@ -153,9 +229,9 @@ void *ttlmap_delete(ttlmap *map, void *item)
 void *ttlmap_probe(ttlmap *map, uint64_t position)
 {
 	void *ret;
-	pthread_mutex_lock(&map->hlock);
+	TTLMAP_LOCK(map);
 	ret = hashmap_probe(map->hmap, position);
-	pthread_mutex_unlock(&map->hlock);
+	TTLMAP_UNLOCK(map);
 	return ret;
 }
 
@@ -164,9 +240,9 @@ bool ttlmap_scan(ttlmap *map,
                   bool (*iter)(const void *item, void *udata), void *udata)
 {
 	bool ret;
-	pthread_mutex_lock(&map->hlock);
+	TTLMAP_LOCK(map);
 	ret = hashmap_scan(map->hmap, iter, udata);
-	pthread_mutex_unlock(&map->hlock);
+	TTLMAP_UNLOCK(map);
 	return ret;
 }
 
@@ -174,9 +250,9 @@ bool ttlmap_scan(ttlmap *map,
 bool ttlmap_iter(ttlmap *map, size_t *i, void **item)
 {
 	bool ret;
-	pthread_mutex_lock(&map->hlock);
+	TTLMAP_LOCK(map);
 	ret = hashmap_iter(map->hmap, i, item);
-	pthread_mutex_unlock(&map->hlock);
+	TTLMAP_UNLOCK(map);
 	return ret;
 }
 

@@ -8,7 +8,10 @@
 typedef struct ttlmap {
 	struct hashmap	*hmap;
 	size_t		elsize;
+
+        int             safe;
 	pthread_mutex_t	hlock;
+
 	timewheel_t	*tw;
 } ttlmap;
 
@@ -35,6 +38,31 @@ struct ttlmap *ttlmap_new_with_allocator(
                             void (*elfree)(void *item),
                             void *udata, 
 			    timewheel_t *twptr);
+
+ttlmap *ttlmap_new_threadunsafe(size_t elsize, size_t cap, 
+                            uint64_t seed0, uint64_t seed1,
+                            uint64_t (*hash)(const void *item, 
+                                             uint64_t seed0, uint64_t seed1),
+                            int (*compare)(const void *a, const void *b, 
+                                           void *udata),
+                            void (*elfree)(void *item),
+                            void *udata, 
+			    timewheel_t *twptr);
+
+struct ttlmap *ttlmap_new_with_allocator_threadunsafe(
+                            void *(*malloc)(size_t), 
+                            void *(*realloc)(void *, size_t), 
+                            void (*free)(void*),
+                            size_t elsize, size_t cap, 
+                            uint64_t seed0, uint64_t seed1,
+                            uint64_t (*hash)(const void *item, 
+                                             uint64_t seed0, uint64_t seed1),
+                            int (*compare)(const void *a, const void *b, 
+                                           void *udata),
+                            void (*elfree)(void *item),
+                            void *udata, 
+			    timewheel_t *twptr);
+
 void ttlmap_free(ttlmap *map);
 void ttlmap_clear(ttlmap *map, bool update_cap);
 size_t ttlmap_count(ttlmap *map);
