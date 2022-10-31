@@ -1,10 +1,10 @@
 # ttlHashMap
-A general-purpose, thread-safe hash map that supports TTL of the items. It is built upon https://github.com/tidwall/hashmap.c.git .
+A general-purpose, thread-safe hash map that supports TTL of the items. It is built upon `tidwall/hashmap.c`.
 
 ## Features
 - All features from tidwall/hashmap.c
 - The TTL of item can be set for expiration
-- Thread-Safety
+- Thread-Safety (optional)
 - A general-purpose task scheduler implemented with time wheel and can be reused by maintaining refcount
 
 ## Example
@@ -137,6 +137,8 @@ ttlmap_set      # insert or replace an existing item and return the previous
 ttlmap_get      # get an existing item (ttl will be set if ttl_ms > 0)
 ttlmap_delete   # delete and return an item
 ttlmap_clear    # clear the ttl hash map
+
+ttlmap_new_threadunsafe      # allocate a new ttl hash map without lock
 ```
 ### Iteration
 ```sh
